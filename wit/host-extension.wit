@@ -1,0 +1,6 @@
+package host-extension:plugin;
+
+world host-extension {
+  import print: func(msg: string);
+  export run: func(msg: string) -> list<string>;
+}
