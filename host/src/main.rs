@@ -75,7 +75,7 @@ fn main() -> anyhow::Result<()> {
 
         loop {
             if let Ok(Ok(notify::Event {
-                kind: notify::EventKind::Create(..),
+                kind: notify::EventKind::Create(..) | notify::EventKind::Modify(..),
                 ..
             })) = rx.try_recv()
             {
