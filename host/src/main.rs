@@ -1,5 +1,8 @@
+use std::sync::mpsc;
+
 use clap::Parser;
 use lipsum::lipsum;
+use notify::Watcher;
 use rand::Rng;
 use wasmtime::{
     Engine, Store,
@@ -53,26 +56,40 @@ impl HostExtensionImports for HostState {
 
 fn main() -> anyhow::Result<()> {
     let args = cli::Args::parse();
-    let engine = Engine::default();
-    let component = Component::from_file(&engine, args.path)?;
+    let (tx, rx) = mpsc::channel::<notify::Result<notify::Event>>();
+    let mut watcher = notify::recommended_watcher(tx)?;
+    watcher.watch(&args.path, notify::RecursiveMode::Recursive)?;
+    let mut rng = rand::rng();
 
+    let engine = Engine::default();
     let mut linker = Linker::new(&engine);
 
     wasmtime_wasi::p2::add_to_linker_sync(&mut linker)?;
     HostExtension::add_to_linker::<_, HasSelf<_>>(&mut linker, |state| state)?;
 
     let mut store = Store::new(&engine, HostState::new());
-    let bindings = HostExtension::instantiate(&mut store, &component, &linker)?;
-
-    let mut rng = rand::rng();
 
     loop {
-        let arg = lipsum(rng.random_range(1..6));
-        let res = bindings.call_run(&mut store, &arg)?;
+        let component = Component::from_file(&engine, &args.path)?;
+        let bindings = HostExtension::instantiate(&mut store, &component, &linker)?;
 
-        println!("{res:?}");
-        println!("Print counter: {}", store.data().print_counter);
+        loop {
+            if let Ok(Ok(notify::Event {
+                kind: notify::EventKind::Create(..),
+                ..
+            })) = rx.try_recv()
+            {
+                println!("-- RELOADING PLUGIN: `{}`", args.path.display());
+                break;
+            }
 
-        std::thread::sleep(std::time::Duration::from_millis(args.sleep));
+            let arg = lipsum(rng.random_range(1..6));
+            let res = bindings.call_run(&mut store, &arg)?;
+
+            println!("{res:?}");
+            println!("Print counter: {}", store.data().print_counter);
+
+            std::thread::sleep(std::time::Duration::from_millis(args.sleep));
+        }
     }
 }
