@@ -61,7 +61,7 @@ Print counter: 3
 ```
 ### C#
 ```
-cargo run -- --path ./plugin-csharp/bin/Release/net10.0/wasi-wasm/native/plugin-csharp.wasm
+cargo run -- --path plugin-csharp/bin/Release/net10.0/wasi-wasm/native/plugin-csharp.wasm
 
 Message from C#
 ["Lorem", "ipsum", "dolor."]
