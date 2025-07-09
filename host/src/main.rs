@@ -1,5 +1,6 @@
 use std::sync::mpsc;
 
+use anyhow::anyhow;
 use clap::Parser;
 use lipsum::lipsum;
 use notify::Watcher;
@@ -67,9 +68,10 @@ fn main() -> anyhow::Result<()> {
     wasmtime_wasi::p2::add_to_linker_sync(&mut linker)?;
     HostExtension::add_to_linker::<_, HasSelf<_>>(&mut linker, |state| state)?;
 
-    let mut store = Store::new(&engine, HostState::new());
+    let mut state = Some(HostState::new());
 
     loop {
+        let mut store = Store::new(&engine, state.take().ok_or(anyhow!("Missing host state!"))?);
         let component = Component::from_file(&engine, &args.path)?;
         let bindings = HostExtension::instantiate(&mut store, &component, &linker)?;
 
@@ -91,5 +93,7 @@ fn main() -> anyhow::Result<()> {
 
             std::thread::sleep(std::time::Duration::from_millis(args.sleep));
         }
+
+        state = Some(store.into_data());
     }
 }
